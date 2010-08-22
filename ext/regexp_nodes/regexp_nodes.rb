@@ -103,6 +103,19 @@ class ExternalNode
         ({ 'classes' => classes, 'parameters' => parameters}).to_yaml
     end
 
+    # Method for setting a parameter; if the parameter is already set it converts the value to an array and pushes the new value.
+    
+    def set_parameter(p_name, p_value)
+      if @parameters.has_key? p_name.to_s
+        @parameters[p_name.to_s] = [@parameters[p_name.to_s]] unless @parameters[p_name.to_s].is_a? Array
+        @parameters[p_name.to_s] << p_value
+      else
+        @parameters[ p_name.to_s ] = p_value
+      end
+      $LOG.debug("Set @parameters[#{p_name.to_s}] = #{p_value.inspect}")
+
+    end
+    
     # Private method that expects an absolute path to a file and a string to
     # match - it returns true if the string was matched by any of the lines in
     # the file
@@ -162,6 +175,15 @@ class ExternalNode
 
             filepath = "#{fullpath}/#{parametername}"
             next if File.basename(filepath) =~ /^\./     # skip over dotfiles
+            
+            if File.extname(filepath) == '.rb'
+              begin
+                eval(File.read(filepath))
+              rescue => e
+                $LOG.debug "Eval failed for #{filepath}: #{e}"
+              end
+            end
+            
 
             next unless File.directory?(filepath) and
                         File.readable?(filepath)        # skip over non-directories
@@ -175,8 +197,7 @@ class ExternalNode
                     File.readable?(secondlevel)
                 $LOG.debug("Attempting to match [#{@hostname}] in [#{secondlevel}]")
                 if matched_in_patternfile?(secondlevel, @hostname)
-                     @parameters[ parametername.to_s ] = patternfile.to_s
-                     $LOG.debug("Set @parameters[#{parametername.to_s}] = #{patternfile.to_s}")
+                  set_parameter(parametername.to_s, patternfile.to_s)
                 end # if
             end # Dir.foreach #{filepath}
         end # Dir.foreach #{fullpath}
